@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 var headerLogo = []string{ // Строки большого ASCII-логотипа шапки.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+
+	"github.com/fr33dman/yandex-station-picklock/pkg/scenario"
 )
 
 func WaitUpdate(ctx context.Context) error {
@@ -31,7 +33,7 @@ func WaitUpdate(ctx context.Context) error {
 	if err != nil || !ip.Is4() || !ip.IsPrivate() {
 		return errors.New("station address must be a private IPv4 address")
 	}
-	if err := wait(ctx, func(ctx context.Context) error { return s.Device.Connect(ctx, ip) }); err != nil {
+	if err := scenario.Poll(ctx, waitTimeout, func(ctx context.Context) error { return s.Device.Connect(ctx, ip) }); err != nil {
 		return err
 	}
 	s.address = ip

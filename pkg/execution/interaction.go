@@ -31,3 +31,27 @@ func CurrentTask(ctx context.Context) (TaskInfo, bool) {
 	task, ok := ctx.Value(taskKey{}).(TaskInfo) // Читаем значение по закрытому ключу контекста.
 	return task, ok
 }
+
+// OptionalDecision решает, запускать ли необязательный шаг сценария.
+// UI подключает её через WithOptionalDecision; без решения шаг выполняется.
+type OptionalDecision func(context.Context, Stage) (bool, error)
+
+// optionalKey служит закрытым ключом контекста для решения о необязательных шагах.
+type optionalKey struct{}
+
+// WithOptionalDecision связывает с контекстом выбор пользователя для шагов с IsOptional.
+func WithOptionalDecision(ctx context.Context, decide OptionalDecision) context.Context {
+	if decide == nil {
+		return ctx // Без решения шаг выполняется по умолчанию.
+	}
+	return context.WithValue(ctx, optionalKey{}, decide)
+}
+
+// decideOptional спрашивает о запуске необязательного шага; по умолчанию запускает его.
+func decideOptional(ctx context.Context, stage Stage) (bool, error) {
+	decide, ok := ctx.Value(optionalKey{}).(OptionalDecision) // Читаем решение по закрытому ключу контекста.
+	if !ok || decide == nil {
+		return true, nil // Детерминированный запуск без UI сохраняет обычное поведение.
+	}
+	return decide(ctx, stage)
+}

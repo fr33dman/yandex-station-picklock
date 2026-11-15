@@ -1,3 +1,7 @@
+// Package execution is the public engine of the scenario SDK: stage config
+// (critical, optional), the job tree and their observable snapshots. Scenario
+// authors usually start from pkg/scenario constructors and ready-made steps,
+// and may describe Stage values by hand when the SDK does not fit.
 package execution
 
 import (
@@ -8,10 +12,33 @@ import (
 )
 
 // Stage описывает один шаг; состояние выполнения и восстановление хранит его Job.
+// Готовые конструкторы NewStage, Optional и BestEffort подставляют безопасные
+// умолчания; поля можно заполнять и вручную.
 type Stage struct {
 	Name        string                      // Название шага для статуса и ошибок.
 	Description string                      // Описание действий шага для UI.
+	IsCritical  bool                        // Сбой шага останавливает весь pipeline.
+	IsOptional  bool                        // Пользователь выбирает, запускать шаг или пропустить его.
 	Executive   func(context.Context) error // Действие шага; отмена передаётся через контекст.
+}
+
+// NewStage создаёт критичный шаг: его сбой останавливает весь pipeline.
+// Это рекомендуемый конструктор; BestEffort снимает критичность.
+func NewStage(name, description string, executive func(context.Context) error) Stage {
+	return Stage{Name: name, Description: description, IsCritical: true, Executive: executive}
+}
+
+// BestEffort оставляет сбой шага в снимке и графе, но не останавливает pipeline.
+func (s Stage) BestEffort() Stage {
+	s.IsCritical = false
+	return s
+}
+
+// Optional даёт пользователю выбор: запустить шаг или пропустить его.
+// Решение принимает OptionalDecision из контекста; без него шаг выполняется.
+func (s Stage) Optional() Stage {
+	s.IsOptional = true
+	return s
 }
 
 // Execute запускает шаг, учитывает отмену и превращает панику в ошибку со стеком.

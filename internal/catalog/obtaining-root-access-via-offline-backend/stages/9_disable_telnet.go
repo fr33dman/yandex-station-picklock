@@ -6,6 +6,7 @@ import (
 
 	"github.com/fr33dman/yandex-station-picklock/artifacts"
 	"github.com/fr33dman/yandex-station-picklock/pkg/boot"
+	"github.com/fr33dman/yandex-station-picklock/pkg/scenario"
 )
 
 // DisableTelnet Stage
@@ -40,7 +41,7 @@ func DisableTelnet(ctx context.Context) error {
 	if _, err := s.Device.SSH(ctx, "stop rootshell"); err != nil {
 		return err
 	}
-	return wait(ctx, func(ctx context.Context) error {
+	return scenario.Poll(ctx, waitTimeout, func(ctx context.Context) error {
 		if _, err := s.Device.SSH(ctx, rootProof+"\ntest \"$(getprop init.svc.rootshell)\" = stopped"); err != nil {
 			return err
 		}

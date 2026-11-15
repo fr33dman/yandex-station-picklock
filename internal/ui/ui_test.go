@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 // testModel создаёт модель с двумя сценариями и фиксированным размером терминала.

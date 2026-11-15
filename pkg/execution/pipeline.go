@@ -37,7 +37,18 @@ func NewPipeline(jobs ...Job) (*Pipeline, error) {
 	return p, nil
 }
 
+// NewPipelineFromStages собирает последовательный pipeline из готовых шагов.
+// Критичность и необязательность шага берутся из Stage; запасных путей нет.
+func NewPipelineFromStages(stages ...Stage) (*Pipeline, error) {
+	jobs := make([]Job, 0, len(stages))
+	for _, stage := range stages {
+		jobs = append(jobs, NewSingleJob(stage, nil)) // Каждый шаг становится отдельной задачей по порядку.
+	}
+	return NewPipeline(jobs...)
+}
+
 // Execute последовательно запускает корневые задачи в горутинах и опрашивает их раз в секунду.
+// Сбой критичного шага пропускает оставшиеся; сбой best-effort шага остаётся только в снимке.
 // При отмене ждёт начатую работу; шаги должны сами учитывать контекст.
 func (p *Pipeline) Execute(ctx context.Context) error {
 	p.mu.Lock() // Блокируем изменение состояния pipeline.
@@ -68,12 +79,18 @@ func (p *Pipeline) Execute(ctx context.Context) error {
 				}
 			}
 		}
-		if err != nil {
+		if err == nil {
+			p.capture(Running, nil) // Обновляем общий снимок pipeline.
+			continue
+		}
+		if ctx.Err() != nil || job.critical() { // Отмена и критичный сбой останавливают цепочку.
 			for _, remaining := range p.jobs[i:] {
 				remaining.skip() // Пропускаем оставшиеся задачи после остановки.
 			}
 			break
 		}
+		// Best-effort шаг уже записал сбой в свой снимок: продолжаем следующие шаги.
+		err = nil
 		p.capture(Running, nil) // Обновляем общий снимок pipeline.
 	}
 	err = withCancellation(ctx, err)       // Сохраняем ошибку операции вместе с причиной отмены.
@@ -87,6 +104,7 @@ func (p *Pipeline) Snapshot() PipelineSnapshot {
 	defer p.mu.RUnlock()                     // Освобождаем блокировку чтения снимка.
 	snapshot := p.snapshot                   // Отдельный снимок состояния для вызывающего кода.
 	snapshot.Jobs = cloneJobs(snapshot.Jobs) // Глубоко копируем дочерние снимки.
+	snapshot.Warnings = append([]string(nil), snapshot.Warnings...)
 	return snapshot
 }
 
@@ -96,9 +114,9 @@ func (p *Pipeline) capture(status Status, err error) {
 	for i, job := range p.jobs {
 		jobs[i] = job.Snapshot() // Получаем снимок дочерней задачи.
 	}
-	p.mu.Lock()                                                                      // Блокируем изменение состояния pipeline.
-	p.snapshot = PipelineSnapshot{Status: status, Error: errorText(err), Jobs: jobs} // Атомарно сохраняем собранные статусы и общую ошибку.
-	p.mu.Unlock()                                                                    // Снимаем блокировку изменения pipeline.
+	p.mu.Lock()                                                                                                // Блокируем изменение состояния pipeline.
+	p.snapshot = PipelineSnapshot{Status: status, Error: errorText(err), Jobs: jobs, Warnings: warnings(jobs)} // Атомарно сохраняем собранные статусы, ошибку и допущенные сбои.
+	p.mu.Unlock()                                                                                              // Снимаем блокировку изменения pipeline.
 }
 
 // validateJobs обходит дерево и отвергает пустые, повторные и неподдерживаемые узлы.

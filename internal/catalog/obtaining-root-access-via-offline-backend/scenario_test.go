@@ -20,9 +20,9 @@ import (
 
 	"github.com/fr33dman/yandex-station-picklock/artifacts"
 	"github.com/fr33dman/yandex-station-picklock/internal/catalog/obtaining-root-access-via-offline-backend/stages"
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
 	"github.com/fr33dman/yandex-station-picklock/pkg/backend/ota"
 	"github.com/fr33dman/yandex-station-picklock/pkg/boot"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 	"github.com/fr33dman/yandex-station-picklock/pkg/station"
 )
 
@@ -322,7 +322,7 @@ func TestCompleteScenarioWithUserRetries(t *testing.T) {
 		t.Fatalf("retry/backend lifetime: %+v, playbacks=%d", backend, ui.playbacks)
 	}
 	snapshot := scenario.Pipeline.Snapshot()
-	if snapshot.Status != execution.Succeeded || len(snapshot.Jobs) != 12 {
+	if snapshot.Status != execution.Succeeded || len(snapshot.Jobs) != 13 {
 		t.Fatalf("scenario status: %+v", snapshot)
 	}
 	for _, job := range snapshot.Jobs {
@@ -379,7 +379,7 @@ func TestBootFailuresNeverReachReboot(t *testing.T) {
 					t.Fatal("canceled write lost its verified readback")
 				}
 			}
-			if scenario.Pipeline.Snapshot().Jobs[7].Status != execution.Skipped {
+			if scenario.Pipeline.Snapshot().Jobs[8].Status != execution.Skipped {
 				t.Fatal("downstream reboot was not skipped")
 			}
 		})
@@ -399,7 +399,7 @@ func TestSSHFailureKeepsTelnetRecovery(t *testing.T) {
 	if !device.telnet || device.writes != 1 || device.firewall {
 		t.Fatal("Telnet was removed before verifying SSH")
 	}
-	if scenario.Pipeline.Snapshot().Jobs[10].Status != execution.Skipped {
+	if scenario.Pipeline.Snapshot().Jobs[11].Status != execution.Skipped {
 		t.Fatal("Telnet removal was not skipped")
 	}
 }

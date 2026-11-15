@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/fr33dman/yandex-station-picklock/pkg/boot"
+	"github.com/fr33dman/yandex-station-picklock/pkg/scenario"
 	"github.com/fr33dman/yandex-station-picklock/pkg/station"
 )
 
@@ -16,7 +17,7 @@ func WaitReboot(ctx context.Context) error {
 	if s.writtenSHA256 != boot.RootSHA256 {
 		return errors.New("verified root boot has not been written")
 	}
-	err = wait(ctx, func(ctx context.Context) error {
+	err = scenario.Poll(ctx, waitTimeout, func(ctx context.Context) error {
 		if err := s.Device.Connect(ctx, s.address); err != nil {
 			return err
 		}

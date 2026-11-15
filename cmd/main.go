@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
 	"github.com/fr33dman/yandex-station-picklock/internal/ui"
 	"github.com/fr33dman/yandex-station-picklock/pkg/backend/ota"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 // main запускает приложение и выставляет код ошибки при сбое; обычная отмена допустима.

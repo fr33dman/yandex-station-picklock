@@ -12,6 +12,7 @@ type (
 		Snapshot() JobSnapshot         // Snapshot возвращает состояние узла и его ветвей.
 		execute(context.Context) error // execute исполняет узел с общим контекстом.
 		skip()                         // skip пропускает ещё не начатые части узла.
+		critical() bool                // critical сообщает, останавливает ли сбой узла pipeline.
 	}
 	// SingleJob выполняет один Stage и при ошибке запускает запасную задачу.
 	SingleJob struct {
@@ -45,16 +46,29 @@ func NewParallelJobs(jobs []Job, fallback Job) *ParallelJobs {
 
 // execute запускает шаг с метаданными задачи, затем обновляет состояние с учётом восстановления.
 func (j *SingleJob) execute(ctx context.Context) error {
+	_, _, id := j.state.snapshot()                                                                                  // Читаем защищённое состояние и идентификатор задачи.
+	ctx = context.WithValue(ctx, taskKey{}, TaskInfo{ID: id, Name: j.stage.Name, Description: j.stage.Description}) // Помещаем ID, имя и описание задачи в контекст её шага.
+	if j.stage.IsOptional {                                                                                         // Необязательный шаг запускается только с согласия пользователя.
+		run, err := decideOptional(ctx, j.stage) // Спрашиваем, запускать шаг или пропустить его.
+		if err != nil {
+			j.stageState.skip()      // Шаг не начинался, поэтому показываем его пропущенным.
+			j.state.finish(ctx, err) // Сохраняем причину отказа от запуска.
+			return err
+		}
+		if !run {
+			j.stageState.skip() // Помечаем исходный шаг пропущенным по выбору пользователя.
+			j.state.skip()      // Помечаем ещё не начатую задачу пропущенной.
+			return nil
+		}
+	}
 	if err := j.state.start(); err != nil { // Помечаем задачу выполняемой и исключаем повторный запуск.
 		return err
 	}
-	_, _, id := j.state.snapshot()                                                                                  // Читаем защищённое состояние и идентификатор задачи.
-	ctx = context.WithValue(ctx, taskKey{}, TaskInfo{ID: id, Name: j.stage.Name, Description: j.stage.Description}) // Помещаем ID, имя и описание задачи в контекст её шага.
-	_ = j.stageState.start()                                                                                        // Помечаем исходный шаг выполняемым.
-	err := j.stage.Execute(ctx)                                                                                     // Выполняем исходный шаг задачи.
-	j.stageState.finish(ctx, err)                                                                                   // Сохраняем результат исходного шага до восстановления.
-	err = runFallback(ctx, err, j.fallback)                                                                         // Пробуем восстановление, если ошибка допускает его запуск.
-	j.state.finish(ctx, err)                                                                                        // Сохраняем итог задачи с учётом восстановления.
+	_ = j.stageState.start()                // Помечаем исходный шаг выполняемым.
+	err := j.stage.Execute(ctx)             // Выполняем исходный шаг задачи.
+	j.stageState.finish(ctx, err)           // Сохраняем результат исходного шага до восстановления.
+	err = runFallback(ctx, err, j.fallback) // Пробуем восстановление, если ошибка допускает его запуск.
+	j.state.finish(ctx, err)                // Сохраняем итог задачи с учётом восстановления.
 	return err
 }
 
@@ -106,6 +120,7 @@ func (j *SingleJob) Snapshot() JobSnapshot {
 		Stage: &StageSnapshot{
 			Name: j.stage.Name, Description: j.stage.Description,
 			Status: stageStatus, Error: stageErr,
+			IsCritical: j.stage.IsCritical, IsOptional: j.stage.IsOptional,
 		},
 	}
 	if j.fallback != nil {
@@ -127,6 +142,19 @@ func (j *ParallelJobs) Snapshot() JobSnapshot {
 		snapshot.Fallback = &fallback
 	}
 	return snapshot
+}
+
+// critical сообщает, останавливает ли сбой шага весь pipeline.
+func (j *SingleJob) critical() bool { return j.stage.IsCritical }
+
+// critical сообщает, останавливает ли сбой группы весь pipeline: достаточно одной критичной ветви.
+func (j *ParallelJobs) critical() bool {
+	for _, job := range j.jobs {
+		if job.critical() {
+			return true
+		}
+	}
+	return false
 }
 
 // runFallback восстанавливает задачу после ошибки; при отмене запасной путь пропускается.

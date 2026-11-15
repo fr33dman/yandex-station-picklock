@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 // span хранит фрагмент строки графа с одним стилем.

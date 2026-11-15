@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/fr33dman/yandex-station-picklock/pkg/quasarsound"
+	"github.com/fr33dman/yandex-station-picklock/pkg/scenario"
 )
 
 func ConnectStationToWifi(ctx context.Context) error {
@@ -11,25 +12,9 @@ func ConnectStationToWifi(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	wav, err := quasarsound.Encode(quasarsound.Config{SSID: s.ssid, Password: s.password, Hidden: s.hidden, Token: "offline"})
-	if err != nil {
-		return err
-	}
-	s.password = ""
-	defer clear(wav)
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := s.UI.Play(ctx, wav); err != nil {
-			return err
-		}
-		connected, err := s.UI.Confirm(ctx, "Колонка подключилась к изолированной Wi-Fi сети?")
-		if err != nil {
-			return err
-		}
-		if connected {
-			return nil
-		}
-	}
+	// Сигнал и цикл повторов готовит SDK: сценарию не нужны собственные
+	// вызовы quasarsound и проигрывателя.
+	config := quasarsound.Config{SSID: s.ssid, Password: s.password, Hidden: s.hidden, Token: "offline"}
+	s.password = "" // Пароль остаётся только в подготовленном сигнале и затирается SDK.
+	return scenario.PairWiFi(s.UI, config, "Колонка подключилась к изолированной Wi-Fi сети?")(ctx)
 }

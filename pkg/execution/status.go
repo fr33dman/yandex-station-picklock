@@ -50,6 +50,8 @@ type StageSnapshot struct {
 	Description string `json:"description"`     // Описание действий шага.
 	Status      Status `json:"status"`          // Результат самого шага, независимо от восстановления.
 	Error       string `json:"error,omitempty"` // Текст ошибки шага, если она есть.
+	IsCritical  bool   `json:"isCritical"`      // Сбой шага останавливает весь pipeline.
+	IsOptional  bool   `json:"isOptional"`      // Пользователь мог пропустить этот шаг.
 }
 
 // JobSnapshot содержит состояние задачи, её дочерних узлов и запасного пути.
@@ -64,9 +66,35 @@ type JobSnapshot struct {
 
 // PipelineSnapshot содержит общий результат и дерево состояний задач.
 type PipelineSnapshot struct {
-	Status Status        `json:"status"`          // Общее состояние исполнения.
-	Error  string        `json:"error,omitempty"` // Текст итоговой ошибки.
-	Jobs   []JobSnapshot `json:"jobs"`            // Корневые задачи со всеми вложенными состояниями.
+	Status   Status        `json:"status"`             // Общее состояние исполнения.
+	Error    string        `json:"error,omitempty"`    // Текст итоговой ошибки.
+	Warnings []string      `json:"warnings,omitempty"` // Сбои шагов, которые не остановили pipeline.
+	Jobs     []JobSnapshot `json:"jobs"`               // Корневые задачи со всеми вложенными состояниями.
+}
+
+// warnings собирает сбои best-effort шагов, которые не остановили pipeline.
+func warnings(jobs []JobSnapshot) []string {
+	var result []string            // Тексты допущенных сбоев в порядке дерева задач.
+	var walk func(JobSnapshot)     // Рекурсивный обход задач, ветвей и запасных путей.
+	walk = func(job JobSnapshot) { // Собираем сбои текущего узла и его потомков.
+		if job.Stage != nil && job.Status == Failed && !job.Stage.IsCritical {
+			text := job.Stage.Error // Текст сбоя шага, который не остановил pipeline.
+			if text == "" {
+				text = "шаг завершился с ошибкой" // Поясняем сбой без текста ошибки.
+			}
+			result = append(result, job.Stage.Name+": "+text) // Сохраняем сбой вместе с именем шага.
+		}
+		for _, child := range job.Jobs {
+			walk(child) // Обходим дочерний узел и его запасную ветвь.
+		}
+		if job.Fallback != nil {
+			walk(*job.Fallback) // Обходим дочерний узел и его запасную ветвь.
+		}
+	}
+	for _, job := range jobs {
+		walk(job) // Обходим корневой узел и его потомков.
+	}
+	return result
 }
 
 // runState защищает состояние узла и его принадлежность pipeline от конкурентного доступа.

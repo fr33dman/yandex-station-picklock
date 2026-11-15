@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
 	"github.com/fr33dman/yandex-station-picklock/pkg/backend/ota"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 	"github.com/fr33dman/yandex-station-picklock/pkg/station"
 )
 
@@ -150,23 +150,7 @@ func syncDirectory(name string) error {
 	return errors.Join(directory.Sync(), directory.Close())
 }
 
-func wait(ctx context.Context, check func(context.Context) error) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	var last error
-	for {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(err, last)
-		}
-		if last = check(ctx); last == nil {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return errors.Join(ctx.Err(), last)
-		case <-ticker.C:
-		}
-	}
-}
+// waitTimeout ограничивает ожидание готовности устройства после операции.
+// Само ожидание выполняет scenario.Poll из SDK, чтобы у сценария не было
+// собственного цикла опроса.
+const waitTimeout = 5 * time.Minute

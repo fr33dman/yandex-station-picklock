@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 // phase задаёт текущий экран: выбор, подтверждение, выполнение или результат.

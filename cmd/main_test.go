@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 )
 
 // TestInteractiveDefaultsAndStandaloneFlags проверяет режим по умолчанию и ограничения флагов OTA.

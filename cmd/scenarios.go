@@ -10,9 +10,9 @@ import (
 
 	offline "github.com/fr33dman/yandex-station-picklock/internal/catalog/obtaining-root-access-via-offline-backend"
 	"github.com/fr33dman/yandex-station-picklock/internal/catalog/obtaining-root-access-via-offline-backend/stages"
-	"github.com/fr33dman/yandex-station-picklock/internal/execution"
 	"github.com/fr33dman/yandex-station-picklock/internal/ui"
 	"github.com/fr33dman/yandex-station-picklock/pkg/backend"
+	"github.com/fr33dman/yandex-station-picklock/pkg/execution"
 	"github.com/fr33dman/yandex-station-picklock/pkg/station"
 )
 
